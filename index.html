@@ -1,0 +1,447 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fair Value Market Lab v4.2</title><style>
+:root{color-scheme:dark;--bg:#09111f;--panel:#142238;--line:#2b3d55;--text:#eef5ff;--muted:#9aadc8;--blue:#6baaff;--green:#4bddb4}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#122541,#09111f 55%);color:var(--text);font:14px system-ui,sans-serif}main{max-width:1350px;margin:auto;padding:28px 18px}header,.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}h1{font-size:27px;margin:0}h1 em{font-style:normal;color:var(--blue)}h2{font-size:16px;margin:0 0 15px}.muted{color:var(--muted)}header{margin-bottom:25px}.grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}.card,.panel{background:#142238e8;border:1px solid var(--line);border-radius:15px;padding:17px}.card label{color:var(--muted);font-size:12px}.big{font-size:25px;font-weight:750;margin-top:8px;overflow-wrap:anywhere}.panel{margin-top:15px}.progress{background:#2b3e58;height:10px;border-radius:15px;overflow:hidden;margin:17px 0}.progress>div{height:100%;background:linear-gradient(90deg,#408df3,#4bddb4);width:0}button,input,select{font:inherit;border:1px solid var(--line);border-radius:9px;padding:10px;background:#0c192b;color:var(--text)}button{cursor:pointer}button:hover{border-color:var(--blue)}button.primary{background:#256bc4}input{min-width:0}button:disabled{opacity:.5}.cols{display:grid;grid-template-columns:1fr 1fr;gap:15px}.tablebox{overflow:auto;max-height:550px;border:1px solid var(--line);border-radius:10px}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:13px}th,td{padding:11px;text-align:left;border-bottom:1px solid #2b3d55}th{background:#20324b;position:sticky;top:0;cursor:pointer}td.num{text-align:right}.tag{display:inline-block;padding:4px 8px;border-radius:7px;background:#33425b;font-size:12px}.good{color:#6ce6c4}.warn{color:#ffd48a}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0a1728;padding:13px;border-radius:10px;max-height:290px;overflow:auto}#error{display:none;background:#473124;color:#ffe0bc;padding:13px;border-radius:10px;margin-bottom:15px}.footer{margin-top:18px;line-height:1.7;color:var(--muted);font-size:12px}
+@media(max-width:1100px){.grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:750px){.grid{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}}
+.valuation{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:12px 0}.valuation .card{background:#0e1b2e}.valuation input{width:100%}.up{color:#4bddb4}.down{color:#ff9a9a}.neutral{color:#ffd48a}@media(max-width:750px){.valuation{grid-template-columns:repeat(2,minmax(0,1fr))}}</style><style>
+.climategrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.climategrid .card{background:#0e1b2e}.climategrid .big{font-size:21px}.climate-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0}.climate-controls input{width:110px}.climate-table{max-height:460px}.climate-note{font-size:12px;color:var(--muted);line-height:1.6}@media(max-width:700px){.climategrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style></head><body><main><header><div><h1>FAIR VALUE <em>· MARKET LAB</em></h1><p class="muted">Snapshot Cloudflare · 100 titoli · VIX separato · Qualità EPS · v4.8 Climate × EPS · doppio Worker automatico</p></div><div class="row"><span id="health">Connessione…</span><button class="primary" id="refresh">↻ Aggiorna</button><button id="auto">Auto-refresh OFF</button></div></header><div id="error"></div>
+<div class="grid"><div class="card"><label>Data snapshot</label><div class="big" id="date">—</div></div><div class="card"><label>Titoli completi</label><div class="big" id="complete">—</div></div><div class="card"><label>Avanzamento</label><div class="big" id="percent">—</div></div><div class="card"><label>VIX</label><div class="big" id="vix">—</div></div><div class="card"><label>Stato</label><div class="big" id="status" style="font-size:19px">—</div></div><div class="card"><label>Calibrazione</label><div class="big" id="valid" style="font-size:19px">—</div></div></div>
+<section class="panel"><div class="row"><div><h2>Raccolta giornaliera</h2><span class="muted" id="updated">Nessun dato</span></div><div class="row"><select id="day"><option value="">Nessuna data</option></select><button class="primary" id="exportAll">⬇ Esporta TUTTO .json.gz</button><button id="json">Esporta JSON</button><button id="csv">Esporta CSV</button></div></div><p id="exportAllStatus" class="muted" aria-live="polite">Esportazione completa: include anche dati non ancora caricati, recuperandoli automaticamente.</p><div class="progress"><div id="bar"></div></div><div class="row"><span id="summary" class="muted">—</span><span id="priceDates" class="muted">—</span></div><p id="reasons" class="warn"></p></section>
+<div class="cols"><section class="panel"><h2>Storico snapshot</h2><div class="tablebox" style="max-height:270px"><table><thead><tr><th>Data</th><th>Stato</th><th>Completi</th><th>VIX</th><th>Valido</th></tr></thead><tbody id="history"></tbody></table></div></section><section class="panel"><h2>Diagnostica Worker</h2><p id="diag">—</p><p class="muted">La ripresa automatica si attiva dopo una prima esecuzione del Worker per la giornata. I dati archiviati si leggono da /snapshot/day. /snapshot/latest può essere vuoto finché nessuna giornata è valida per la calibrazione.</p><a href="https://icy-sea-ec77.alessiostanca3.workers.dev/health" target="_blank" rel="noopener" style="color:var(--blue)">Apri /health</a></section></div>
+<section class="panel"><h2>Qualità EPS, Growth Gap e Momentum · v4.3</h2><p class="muted">Gap EPS = (Forward EPS / Trailing EPS − 1) × 100. Δ Gap = variazione in punti percentuali rispetto a 5/10/20 sedute archiviate; non è una previsione di rendimento. Valori mancanti restano vuoti. Nessun prezzo teorico o upside generato. Forward P/E ed EPS possono essere dipendenti: non sono una verifica indipendente. I dati legacy senza prova di acquisizione post-close restano non certificati. Periodi fiscali mancanti non vengono inventati.</p><div class="row"><span id="valuationCounts" class="tag">In attesa</span><span id="climate" class="tag">VIX —</span><span id="quality" class="muted">—</span></div><p id="phaseBanner" class="warn" style="font-weight:700;margin-top:14px">Fase non determinata</p></section>
+<section class="panel" id="climatePanel"><h2>VIX-centrico × EPS · scanner sperimentale 21 sedute · v5.1</h2>
+<p class="climate-note">Due livelli distinti: <b>VIX provvisorio</b> (Climate 35%, sensibilità VIX 25%, resilienza negli shock 20%; pesi rinormalizzati su 80) e <b>VIX + EPS completo</b> (aggiunge EPS 20%). Nessun EPS mancante viene stimato. Il Climate del Worker è usato solo sulla data coincidente con lo snapshot selezionato. Modello sperimentale, non previsione di rendimento a 21 sedute.</p>
+<div class="climate-controls"><span id="climateWorkerStatus" class="tag">Worker VIX: in attesa</span><button id="climateReload">↻ Aggiorna VIX</button><label for="climateManual">Override manuale (0–100):</label><input id="climateManual" type="number" min="0" max="100" step="1" placeholder="Non disponibile"><button id="climateClear">Rimuovi</button><label><input type="checkbox" id="climateProxy"> Usa proxy VIX storico (parziale)</label></div>
+<div class="row" style="margin:12px 0"><button id="pricesReload">↻ Carica / aggiorna storici prezzi</button><span id="pricesStatus" class="muted">Storici non caricati</span></div><div class="climategrid"><div class="card"><label>Climate usato</label><div class="big" id="climateValue">—</div></div><div class="card"><label>Origine</label><div class="big" id="climateSource">—</div></div><div class="card"><label>EPS Score disponibili</label><div class="big" id="epsScoreCount">—</div></div><div class="card"><label>Segnali VIX / completi</label><div class="big" id="signalCount">—</div></div></div>
+<p class="climate-note" id="climateExplanation">Caricamento…</p><p class="climate-note" id="climateWorkerMetrics">VIX3M e VRP: in attesa dei dati del Worker.</p>
+<div class="tablebox climate-table"><table><thead><tr><th>Ticker</th><th>EPS Gap</th><th>EPS Score</th><th>β VIX (%/punto)</th><th>Shock: extra-rend. %</th><th>VIX LONG</th><th>VIX SHORT</th><th>VIX provvisorio</th><th>Completo LONG</th><th>Completo SHORT</th><th>VIX + EPS completo</th><th>Climate</th></tr></thead><tbody id="climateRows"></tbody></table></div>
+<p class="climate-note">Il punteggio VIX provvisorio utilizza esclusivamente fattori di volatilità (35/80 Climate, 25/80 beta, 20/80 shock). Il completo usa 35/25/20/20 aggiungendo EPS. LONG/SHORT richiedono score ≥75 e margine ≥15; altrimenti NEUTRALE. Sono etichette di candidati, non segnali operativi validati. Beta OLS: 40+ osservazioni sulle ultime 60 sedute; shock: almeno 3 aumenti VIX ≥2 punti nelle ultime 126 sedute. Richiesti almeno 20 titoli confrontabili per il ranking VIX; il ranking EPS richiede storico sufficiente. Il punteggio completo resta assente se manca EPS.</p>
+<section class="panel" id="turningPanel"><h2>VIX Turning Point · analisi a 21 sedute · v5.1</h2>
+<p class="climate-note">Segnali calcolati esclusivamente con informazioni disponibili alla chiusura della seduta. La validazione misura il rendimento successivo dell’S&amp;P 500, non quello dei singoli titoli e non dimostra capacità predittiva. Le soglie sono euristiche e non ottimizzate.</p>
+<div class="climategrid"><div class="card"><label>Stato dello stress</label><div class="big" id="tpState">—</div></div><div class="card"><label>Turning Point</label><div class="big" id="tpScore">—</div></div><div class="card"><label>Variazione curva 5 sedute</label><div class="big" id="tpTerm">—</div></div><div class="card"><label>Variazione VRP 5 sedute</label><div class="big" id="tpVrp">—</div></div></div>
+<p class="climate-note" id="tpExplain">Carica gli storici per calcolare il Turning Point.</p>
+<div class="row" style="margin:12px 0"><button id="tpBacktest">Verifica storica 21 sedute</button><span class="muted" id="tpTestStatus">Non eseguita</span></div>
+<div class="tablebox"><table><thead><tr><th>Stato osservato</th><th>Campioni</th><th>Rendimento SPX medio +21 sed.</th><th>Mediana</th><th>% SPX positivo</th></tr></thead><tbody id="tpTestRows"><tr><td colspan="5">Premi «Verifica storica» dopo il caricamento dei prezzi.</td></tr></tbody></table></div>
+<p class="climate-note">La verifica usa osservazioni storiche sovrapposte (non indipendenti), include costi zero, non effettua test fuori campione e non costituisce una strategia LONG/SHORT validata. La cronologia Yahoo può essere revisionata. La classificazione corrente dei titoli resta quella della v4.8, separata da questo modulo esplorativo.</p></section>
+<section class="panel"><div class="row"><div><h2>Scanner dei titoli</h2><span class="muted">Clicca un ticker per vedere il record originale.</span></div><span id="count" class="muted"></span></div><div class="row" style="margin:14px 0"><input id="search" placeholder="Cerca ticker" style="flex:1"><select id="filter"><option value="all">Tutti</option><option value="complete">Con prezzo e fondamentali</option><option value="errors">Con errori</option></select></div><div class="tablebox"><table><thead><tr><th data-key="symbol">Ticker ↕</th><th data-key="price">Prezzo ↕</th><th data-key="date">Data prezzo ↕</th><th data-key="pe">Forward P/E ↕</th><th data-key="eps">Forward EPS ↕</th><th data-key="growth">EPS growth ↕</th><th data-key="trailing">EPS trailing ↕</th><th data-key="ratio">Forward/trailing ↕</th><th data-key="gap">EPS Gap % ↕</th><th data-key="mom5">Δ Gap 5 sed. ↕</th><th data-key="mom10">Δ Gap 10 sed. ↕</th><th data-key="mom20">Δ Gap 20 sed. ↕</th><th>Fase prezzo</th><th>Periodo EPS / fiscale</th><th>Qualità EPS</th><th data-key="tries">Tentativi ↕</th><th>Stato</th></tr></thead><tbody id="stocks"></tbody></table></div></section>
+<div class="cols"><section class="panel"><h2>Fondamentali live</h2><div class="row"><input id="ticker" value="GOOGL" placeholder="Ticker" style="flex:1"><button id="lookup">Consulta</button></div><p class="muted">I valori live possono differire da quelli dello snapshot.</p><pre id="fundOut">Pronto.</pre></section><section class="panel"><h2>Avvio manuale di un lotto</h2><p class="muted">Il token non viene salvato. Dopo il primo lotto, il Worker prosegue automaticamente tramite Durable Object Alarm. Il Cron giornaliero resta necessario per avviare nuove giornate.</p><input id="token" type="password" placeholder="ADMIN_TOKEN" autocomplete="off" style="width:100%"><p><label><input type="checkbox" id="force"> Forza prima delle 16:05 New York (possibili prezzi intraday)</label></p><button id="run">Avvia lotto</button><pre id="runOut">Nessuna esecuzione richiesta.</pre></section></div>
+<section class="panel"><h2>Record selezionato</h2><pre id="detail">Seleziona un ticker.</pre></section><div class="footer">Versione 5.1: non vengono calcolati fair value o rendimenti teorici; le anomalie EPS sono euristiche e non una verifica indipendente. Le valutazioni con snapshot non finalizzato sono provvisorie. La dashboard non inventa dati mancanti. Gli snapshot parziali o raccolti intraday non sono necessariamente idonei alla calibrazione. La classificazione LONG/SHORT è calcolata nella dashboard con soglie sperimentali, non dal Worker EPS. Climate automatico solo su data coincidente.</div></main>
+<script>
+const CLIMATE_BASE='https://icy-scene-2094.alessiostanca3pypl.workers.dev';let remoteClimate=null,remoteClimateError='',climateRequestId=0;
+const BASE='https://icy-sea-ec77.alessiostanca3.workers.dev',el=id=>document.getElementById(id);let days=[],records=[],manifest=null,historySnapshots=new Map(),selected='',sort='symbol',ascending=true,timer=null,loading=false;
+const fmt=(v,d=2)=>v==null||v===''||!Number.isFinite(Number(v))?'—':new Intl.NumberFormat('it-IT',{maximumFractionDigits:d}).format(Number(v));
+const get=(o,...paths)=>{for(const path of paths){const v=path.split('.').reduce((a,k)=>a?.[k],o);if(v!=null&&v!=='')return v}return null};
+const escapeHTML=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(path,opts={}){const controller=new AbortController(),t=setTimeout(()=>controller.abort(),60000);try{const r=await fetch(BASE+path,{...opts,cache:'no-store',signal:controller.signal});const body=await r.json();if(!r.ok)throw Error(body.error||'HTTP '+r.status);return body}finally{clearTimeout(t)}}
+async function refreshRemoteClimate(){
+ const requestId=++climateRequestId;
+ el('climateWorkerStatus').textContent='Worker VIX: caricamento…';
+ el('climateReload').disabled=true;
+ try{
+  const ctrl=new AbortController(),timeout=setTimeout(()=>ctrl.abort(),20000);
+  let response;
+  try{response=await fetch(CLIMATE_BASE+'/climate',{cache:'no-store',signal:ctrl.signal});}
+  finally{clearTimeout(timeout)}
+  const body=await response.json();
+  if(!response.ok||body.ok!==true)throw Error(body.error||'HTTP '+response.status);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(body.date||'')||!Number.isFinite(body.climateScore)||body.climateScore<0||body.climateScore>100)throw Error('Risposta Climate non valida');
+  if(requestId!==climateRequestId)return;
+  remoteClimate=body;remoteClimateError='';
+  el('climateWorkerStatus').textContent='Worker VIX: online · '+body.date;
+ }catch(e){
+  if(requestId!==climateRequestId)return;
+  remoteClimate=null;remoteClimateError=String(e.message||e);
+  el('climateWorkerStatus').textContent='Worker VIX: errore';
+ }finally{if(requestId===climateRequestId){el('climateReload').disabled=false;renderClimate()}}
+}
+function showError(s){el('error').style.display=s?'block':'none';el('error').textContent=s}
+function norm(r){const f=r.fundamentals||{},p=r.price||{};return {raw:r,symbol:r.symbol||'—',price:get(p,'price','close','value','regularMarketPrice')??(typeof p==='number'?p:null),date:get(p,'date'),pe:get(f,'forwardPE','forwardPe'),eps:get(f,'forwardEPS','forwardEps'),growth:get(f,'epsGrowth'),tries:r.tries||0,errors:r.lastErrors||r.errors||[],hasData:!!(r.price&&r.fundamentals)}}
+function render(){const m=manifest;el('date').textContent=m?.day||selected||'—';el('complete').textContent=m?`${m.complete??0}/${m.requested??100}`:'—';const pct=m?.requested?100*(m.complete||0)/m.requested:0;el('percent').textContent=m?fmt(pct,0)+'%':'—';el('bar').style.width=pct+'%';el('vix').textContent=fmt(m?.vix?.price);el('status').textContent=m?.status||'—';el('valid').textContent=m?(m.usableForCalibration?'VALIDO OPERATIVO':'NON VALIDO'):'—';el('valid').className='big '+(m?.usableForCalibration?'good':'warn');el('updated').textContent=m?.updatedAt?'Aggiornato: '+m.updatedAt:'Nessun dato';el('summary').textContent=m?`${m.stored??0} salvati · ${m.complete??0} completi · ${m.missing??Math.max(0,(m.requested??100)-(m.complete??0))} mancanti · ${m.needsPostClose??(m.intradaySymbols?.length??0)} da aggiornare post-close · ${m.pending??0} operazioni ritentabili · ${m.runs??0} lotti · ${m.autoContinuation?'ripresa automatica attiva':'ripresa automatica terminata/non disponibile'}`:'—';el('priceDates').textContent=m?.priceDateCounts?Object.entries(m.priceDateCounts).map(([k,v])=>`${k}: ${v}`).join(' · '):'—';el('reasons').textContent=(m?.reasons||[]).join(' · ');renderStocks()}
+function valuation(r){
+ const n=norm(r),f=r.fundamentals||{},trailing=Number(f.trailingEPS),ratio=trailing>0&&n.eps>0?n.eps/trailing:null;
+ const phase=r.price?.phase || 'unknown';
+ const issues=[];
+ if(!(n.eps>0))issues.push('Forward EPS assente');
+ if(ratio==null)issues.push('Trailing non confrontabile');
+ else if(ratio<0.5||ratio>2)issues.push('Rapporto EPS fuori 0,5–2');
+ if(f.growthSource==='analyst'&&ratio!=null&&Number.isFinite(Number(n.growth))&&Math.abs(ratio-1-Number(n.growth))>0.5)issues.push('Crescite divergenti (periodi differenti possibili)');
+ if(phase!=='post_close')issues.push('Prezzo non certificato post-close');
+ if(manifest?.schemaVersion!==4)issues.push('Snapshot legacy');
+ return {trailing:Number.isFinite(trailing)&&trailing>0?trailing:null,ratio,phase,fiscal:f.fiscalYearEnd?('FY '+f.fiscalYearEnd):(f.forwardEstimatePeriodEnd?('Stima +1y: '+f.forwardEstimatePeriodEnd):'non disponibile'),quality:issues.join(' · ')||'Nessuna anomalia euristica (non verificato)',issues};
+}
+// Gap EPS in punti percentuali; confronti su esattamente N sessioni archiviate.
+// Non interpolare giorni mancanti, non trattare assenza di dati come zero.
+function epsGap(r){
+ const f=r?.fundamentals||{},forward=Number(f.forwardEPS),trailing=Number(f.trailingEPS);
+ return Number.isFinite(forward)&&Number.isFinite(trailing)&&forward>0&&trailing>0?(forward/trailing-1)*100:null;
+}
+function gapMomentum(symbol,currentGap,lookback){
+ if(currentGap==null||!selected)return null;
+ const dates=[...historySnapshots.keys()].filter(d=>d<=selected).sort();
+ const idx=dates.indexOf(selected);
+ if(idx<lookback)return null;
+ const prev=historySnapshots.get(dates[idx-lookback]);
+ const old=prev?.records?.find(r=>r.symbol===symbol);
+ const oldGap=epsGap(old);
+ return oldGap==null?null:currentGap-oldGap;
+}
+function epsMetrics(r){
+ const gap=epsGap(r);
+ return {gap,mom5:gapMomentum(r.symbol,gap,5),mom10:gapMomentum(r.symbol,gap,10),mom20:gapMomentum(r.symbol,gap,20)};
+}
+const fmtSigned=(v)=>v==null?'—':(v>0?'+':'')+fmt(v,2)+' pp';
+function renderStocks(){
+ renderClimate();
+ const q=el('search').value.trim().toUpperCase(),f=el('filter').value;
+ let arr=records.map(r=>({...norm(r),...valuation(r),...epsMetrics(r)})).filter(x=>x.symbol.toUpperCase().includes(q)&&(f==='all'||(f==='complete'&&x.hasData)||(f==='errors'&&x.errors.length)));
+ arr.sort((a,b)=>{let x=a[sort],y=b[sort];let c=typeof x==='number'&&typeof y==='number'?x-y:String(x??'').localeCompare(String(y??''),'it',{numeric:true});return ascending?c:-c});
+ el('count').textContent=`${arr.length} / ${records.length} righe`;
+ const all=records.map(valuation),review=all.filter(x=>x.issues.length).length;
+ el('valuationCounts').textContent=`Da verificare: ${review}/${all.length} · Gap EPS disponibile: ${arr.filter(x=>x.gap!=null).length}/${arr.length} · Nessun segnale LONG/SHORT`;
+ const v=manifest?.vix?.price;
+ el('climate').textContent=manifest?.vixOk&&Number.isFinite(Number(v))?`VIX ${fmt(v)} · ${v<15?'contenuta':v<20?'moderata':v<30?'elevata':'molto elevata'} volatilità`:'VIX non verificato';
+ el('quality').textContent=`Acquisizioni post-close: ${all.filter(x=>x.phase==='post_close').length}/${all.length} · Chiusure verificate indipendentemente: ${manifest?.independentlyVerifiedClose??0} · Snapshot: ${manifest?.usableForCalibration?'calibrabile':'non calibrabile'}`;
+ el('phaseBanner').textContent=manifest?.schemaVersion!==4?'ATTENZIONE: snapshot legacy. Non è possibile certificare retroattivamente i prezzi.':manifest?.snapshotPhase==='intraday'?'ATTENZIONE: SNAPSHOT INTRADAY. Non usare per calibrazione.':manifest?.usableForCalibration?'Snapshot post-close con requisiti di calibrazione soddisfatti':'Snapshot post-close non ancora valido per calibrazione';
+ el('stocks').innerHTML=arr.length?arr.map(x=>`<tr><td><button data-symbol="${escapeHTML(x.symbol)}">${escapeHTML(x.symbol)}</button></td><td class="num">${fmt(x.price)}</td><td>${escapeHTML(x.date||'—')}</td><td class="num">${fmt(x.pe)}</td><td class="num">${fmt(x.eps)}</td><td class="num">${x.growth==null?'—':fmt(Number(x.growth)*100,1)+'%'}</td><td class="num">${fmt(x.trailing)}</td><td class="num">${fmt(x.ratio)}</td><td class="num">${fmtSigned(x.gap)}</td><td class="num">${fmtSigned(x.mom5)}</td><td class="num">${fmtSigned(x.mom10)}</td><td class="num">${fmtSigned(x.mom20)}</td><td>${escapeHTML(x.phase)}</td><td>${escapeHTML(x.fiscal)}</td><td title="${escapeHTML(x.quality)}" class="${x.issues.length?'warn':'muted'}">${escapeHTML(x.quality)}</td><td>${x.tries}</td><td><span class="tag ${x.errors.length?'warn':x.hasData?'good':''}">${x.errors.length?'Errori':x.hasData?'Dati presenti':'Incompleto'}</span></td></tr>`).join(''):'<tr><td colspan="17" class="muted">Nessun record</td></tr>';
+}
+async function loadDay(d){selected=d;el('day').value=d;if(!d){manifest=null;records=[];render();return}try{const obj=await api('/snapshot/day?date='+encodeURIComponent(d));manifest=obj;records=Array.isArray(obj.records)?obj.records:[];historySnapshots.set(d,obj);render()}catch(e){showError('Snapshot '+d+': '+e.message)}}
+async function refresh(){if(loading)return;refreshRemoteClimate();loading=true;el('refresh').disabled=true;showError('');try{const [health,ds]=await Promise.all([api('/health'),api('/snapshot/dates')]);el('health').textContent=health.ok?'● Worker online':'● Worker non pronto';el('health').className=health.ok?'good':'warn';el('diag').textContent=`KV: ${health.kvConfigured?'OK':'NO'} · Durable Object: ${health.doConfigured?'OK':'NO'} · Esecuzione manuale: ${health.manualRunEnabled?'abilitata':'disabilitata'} · ${health.now||''}`;days=Array.isArray(ds.days)?ds.days.sort():[];el('day').innerHTML=days.length?days.map(d=>`<option value="${escapeHTML(d)}">${escapeHTML(d)}</option>`).join(''):'<option value="">Nessuno snapshot</option>';const h=await Promise.all(days.map(async d=>{try{return await api('/snapshot/day?date='+encodeURIComponent(d))}catch{return {day:d,status:'non disponibile'}}}));historySnapshots=new Map(h.filter(x=>x?.day&&Array.isArray(x.records)).map(x=>[x.day,x]));el('history').innerHTML=h.length?h.reverse().map(m=>`<tr><td><button data-day="${escapeHTML(m.day)}">${escapeHTML(m.day)}</button></td><td>${escapeHTML(m.status||'—')}</td><td>${m.complete??'—'}/${m.requested??'—'}</td><td>${fmt(m.vix?.price)}</td><td class="${m.usableForCalibration?'good':'warn'}">${m.usableForCalibration?'Sì':'No'}</td></tr>`).join(''):'<tr><td colspan="5" class="muted">Nessuno snapshot</td></tr>';await loadDay(days.includes(selected)?selected:days.at(-1)||'');if(records.length)loadPriceHistories(false)}catch(e){showError('Aggiornamento non riuscito: '+e.message);el('health').textContent='● Connessione da verificare';el('health').className='warn'}finally{loading=false;el('refresh').disabled=false}}
+function download(name,text,mime){const url=URL.createObjectURL(new Blob([text],{type:mime})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+const csvCell=x=>{const s=String(x??'');return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
+el('refresh').onclick=refresh;el('day').onchange=e=>loadDay(e.target.value);el('search').oninput=renderStocks;el('filter').onchange=renderStocks;
+document.querySelectorAll('th[data-key]').forEach(x=>x.onclick=()=>{ascending=sort===x.dataset.key?!ascending:true;sort=x.dataset.key;renderStocks()});
+el('stocks').onclick=e=>{const b=e.target.closest('[data-symbol]');if(b)el('detail').textContent=JSON.stringify(records.find(x=>x.symbol===b.dataset.symbol),null,2)};
+el('history').onclick=e=>{const b=e.target.closest('[data-day]');if(b)loadDay(b.dataset.day)};
+el('json').onclick=()=>{if(!manifest)return showError('Nessun dato da esportare');download('snapshot_'+selected+'.json',JSON.stringify(manifest,null,2),'application/json')};
+el('csv').onclick=()=>{if(!records.length)return showError('Nessun record da esportare');const keys=['symbol','price','date','pe','eps','growth','trailing','ratio','gap','mom5','mom10','mom20','phase','fiscal','quality','tries','errors'];download('snapshot_'+selected+'.csv','\ufeff'+[keys.join(','),...records.map(r=>{const x={...norm(r),...valuation(r),...epsMetrics(r)};return keys.map(k=>csvCell(k==='errors'?JSON.stringify(x.errors):x[k])).join(',')})].join('\r\n'),'text/csv;charset=utf-8')};
+el('lookup').onclick=async()=>{const s=el('ticker').value.trim().toUpperCase();if(!/^[A-Z0-9.^-]{1,12}$/.test(s))return el('fundOut').textContent='Ticker non valido';el('fundOut').textContent='Caricamento…';try{el('fundOut').textContent=JSON.stringify(await api('/fundamentals?symbol='+encodeURIComponent(s)),null,2)}catch(e){el('fundOut').textContent='Errore: '+e.message}};
+el('run').onclick=async()=>{const token=el('token').value;if(!token)return el('runOut').textContent='Inserisci ADMIN_TOKEN';if(el('force').checked&&!confirm('Forzare ora può salvare prezzi intraday. Continuare?'))return;el('run').disabled=true;el('runOut').textContent='Raccolta in corso…';try{el('runOut').textContent=JSON.stringify(await api('/snapshot/run'+(el('force').checked?'?force=1':''),{method:'POST',headers:{Authorization:'Bearer '+token}}),null,2);await refresh()}catch(e){el('runOut').textContent='Errore: '+e.message}finally{el('token').value='';el('run').disabled=false}};
+el('auto').onclick=()=>{if(timer){clearInterval(timer);timer=null;el('auto').textContent='Auto-refresh OFF'}else{timer=setInterval(refresh,60000);el('auto').textContent='Auto-refresh 60 s';refresh()}};
+
+// Climate × EPS v4.4: solo dati disponibili, nessun riempimento artificiale.
+function finitePositive(x){return x!=null&&x!==''&&Number.isFinite(Number(x))&&Number(x)>0?Number(x):null}
+function validHistoricDates(){return [...historySnapshots.keys()].filter(d=>d<=selected&&historySnapshots.get(d)?.records?.length).sort()}
+function forwardRevision(symbol,n){
+ const dates=validHistoricDates(),idx=dates.indexOf(selected);
+ if(idx<n||idx<0)return null;
+ // Richiede n sedute contigue nell'archivio: niente approssimazione su intervalli incompleti.
+ const now=records.find(r=>r.symbol===symbol),old=historySnapshots.get(dates[idx-n])?.records?.find(r=>r.symbol===symbol);
+ const a=finitePositive(now?.fundamentals?.forwardEPS),b=finitePositive(old?.fundamentals?.forwardEPS);
+ return a!=null&&b!=null?100*(a/b-1):null;
+}
+function percentileRank(v,vals){if(v==null||!vals.length)return null;const lt=vals.filter(x=>x<v).length,eq=vals.filter(x=>x===v).length;return 100*(lt+(eq-1)/2)/Math.max(1,vals.length-1)}
+function gapQuality(gap){return gap==null?null:Math.max(0,100-1.25*Math.abs(gap-20))}
+function proxyVix(){
+ const dates=validHistoricDates(),vals=dates.map(d=>Number(historySnapshots.get(d)?.vix?.price)).filter(v=>Number.isFinite(v)&&v>0);
+ if(vals.length<20||!manifest?.vixOk)return null;
+ const current=Number(manifest?.vix?.price);
+ if(!Number.isFinite(current)||current<=0)return null;
+ const rank=percentileRank(current,vals);
+ return Math.max(0,Math.min(100,Math.round(100-rank)));
+}
+function climateSelected(){
+ const manual=el('climateManual').value.trim();
+ if(manual!==''&&Number.isFinite(Number(manual))&&Number(manual)>=0&&Number(manual)<=100)
+  return {value:Number(manual),source:'Manuale · data da verificare',verified:false};
+ // Never apply the latest climate score to a different historical EPS snapshot.
+ if(remoteClimate&&selected&&remoteClimate.date===selected)
+  return {value:remoteClimate.climateScore,source:'Worker VIX · '+remoteClimate.date,verified:true};
+ if(el('climateProxy').checked){const v=proxyVix();if(v!=null)return {value:v,source:'Proxy · solo VIX',verified:false};}
+ return {value:null,source:remoteClimate&&selected?'Data diversa · Worker '+remoteClimate.date:remoteClimateError?'Worker non disponibile':'Non disponibile',verified:false};
+}
+
+// Historical prices via the existing EPS Worker chart proxy. No Worker changes.
+const priceHistory=new Map();let pricesBusy=false,pricesRequest=0,pricesFailures=0;
+function chartSeries(j){
+ const z=j?.chart?.result?.[0];if(!z)throw Error('Chart Yahoo senza result');
+ const ts=z.timestamp||[],q=z.indicators?.quote?.[0]?.close||[],a=z.indicators?.adjclose?.[0]?.adjclose||[];
+ const out=new Map();for(let i=0;i<ts.length;i++){
+  const v=Number.isFinite(a[i])&&a[i]>0?a[i]:q[i];
+  if(Number.isFinite(v)&&v>0&&Number.isFinite(ts[i]))out.set(new Date(ts[i]*1000).toISOString().slice(0,10),v);
+ }
+ if(out.size<45)throw Error('Storico insufficiente');return out;
+}
+async function getSeries(symbol){
+ const j=await api('/v8/finance/chart/'+encodeURIComponent(symbol)+'?range=2y&interval=1d');
+ return chartSeries(j);
+}
+async function loadPriceHistories(force=false){
+ if(pricesBusy||!records.length)return;
+ pricesBusy=true;const request=++pricesRequest;el('pricesReload').disabled=true;
+ const symbols=['^VIX','^VIX3M','^GSPC',...new Set(records.map(r=>r.symbol).filter(s=>/^[A-Z0-9.^-]{1,12}$/.test(s)))];
+ let next=0,completed=0,failed=0;
+ const work=async()=>{while(next<symbols.length){
+  const symbol=symbols[next++];
+  if(!force&&priceHistory.has(symbol)){completed++;continue}
+  try{priceHistory.set(symbol,await getSeries(symbol))}catch(e){failed++;console.warn('Storico',symbol,e)}
+  completed++;if(request===pricesRequest)el('pricesStatus').textContent=`Storici ${completed}/${symbols.length} · errori ${failed}`;
+ }};
+ try{await Promise.all(Array.from({length:4},work));pricesFailures=failed}
+ finally{pricesBusy=false;el('pricesReload').disabled=false;renderClimate();renderTurning()}
+}
+function marketObservations(symbol,day){
+ const stock=priceHistory.get(symbol),vix=priceHistory.get('^VIX'),spx=priceHistory.get('^GSPC');
+ if(!stock||!vix||!spx||!day)return null;
+ const dates=[...spx.keys()].filter(d=>d<=day&&stock.has(d)&&vix.has(d)).sort();
+ const marketDates=[...spx.keys()].filter(x=>x<=day).sort();
+ const marketIndex=new Map(marketDates.map((d,i)=>[d,i]));
+ const obs=[];for(let i=1;i<dates.length;i++){
+  const d=dates[i],p=dates[i-1],s0=stock.get(p),s1=stock.get(d),m0=spx.get(p),m1=spx.get(d),v0=vix.get(p),v1=vix.get(d);
+  // Ignore non-consecutive market dates in the SPX price series.
+  if(marketIndex.get(d)-marketIndex.get(p)!==1)continue;
+  if([s0,s1,m0,m1,v0,v1].some(x=>!(x>0)))continue;
+  obs.push({date:d,rs:100*Math.log(s1/s0),rm:100*Math.log(m1/m0),dv:v1-v0});
+ }
+ return obs;
+}
+function vixExposure(symbol,day){
+ const obs=marketObservations(symbol,day);if(!obs)return null;
+ const recent=obs.slice(-60);if(recent.length<40)return null;
+ const mx=recent.reduce((a,x)=>a+x.dv,0)/recent.length;
+ const my=recent.reduce((a,x)=>a+x.rs,0)/recent.length;
+ const variance=recent.reduce((a,x)=>a+(x.dv-mx)**2,0);
+ if(variance<0.5)return null;
+ const beta=recent.reduce((a,x)=>a+(x.dv-mx)*(x.rs-my),0)/variance;
+ const shocks=obs.slice(-126).filter(x=>x.dv>=2);
+ const shockAlpha=shocks.length>=3?shocks.reduce((a,x)=>a+x.rs-x.rm,0)/shocks.length:null;
+ return {beta,shockAlpha,shockCount:shocks.length,n:recent.length};
+}
+function epsScores(){
+ const items=records.map(r=>({symbol:r.symbol,gap:epsGap(r),rev5:forwardRevision(r.symbol,5),rev10:forwardRevision(r.symbol,10),gapMom20:gapMomentum(r.symbol,epsGap(r),20)}));
+ const eligible=items.filter(x=>[x.gap,x.rev5,x.rev10,x.gapMom20].every(Number.isFinite));
+ if(eligible.length<20)return new Map();
+ const a=eligible.map(x=>x.rev5),b=eligible.map(x=>x.rev10),c=eligible.map(x=>x.gapMom20),d=eligible.map(x=>gapQuality(x.gap));
+ return new Map(eligible.map(x=>[x.symbol,Math.round(.35*percentileRank(x.rev5,a)+.30*percentileRank(x.rev10,b)+.20*percentileRank(x.gapMom20,c)+.15*percentileRank(gapQuality(x.gap),d))]));
+}
+function classifyScores(longScore,shortScore){
+ if(longScore==null||shortScore==null)return 'DATI INSUFFICIENTI';
+ return longScore>=75&&longScore-shortScore>=15?'LONG':shortScore>=75&&shortScore-longScore>=15?'SHORT':'NEUTRALE';
+}
+function renderClimate(){
+ const climate=climateSelected(),eps=epsScores();
+ const items=records.map(r=>({symbol:r.symbol,gap:epsGap(r),eps:eps.get(r.symbol)??null,market:vixExposure(r.symbol,selected)}));
+ const eligible=items.filter(x=>x.market?.shockAlpha!=null&&Number.isFinite(x.market.beta));
+ const enough=eligible.length>=20;
+ const betas=eligible.map(x=>x.market.beta),alphas=eligible.map(x=>x.market.shockAlpha);
+ const scored=items.map(x=>{
+  let vixLong=null,vixShort=null,longScore=null,shortScore=null;
+  if(enough&&climate.value!=null&&eligible.includes(x)){
+   const resilience=percentileRank(x.market.beta,betas),strength=percentileRank(x.market.shockAlpha,alphas);
+   const vLong=.35*climate.value+.25*resilience+.20*strength;
+   const vShort=.35*(100-climate.value)+.25*(100-resilience)+.20*(100-strength);
+   vixLong=Math.round(vLong/.8);vixShort=Math.round(vShort/.8);
+   if(x.eps!=null){longScore=Math.round(vLong+.20*x.eps);shortScore=Math.round(vShort+.20*(100-x.eps));}
+  }
+  const vixSignal=classifyScores(vixLong,vixShort),fullSignal=classifyScores(longScore,shortScore);
+  return {...x,vixLong,vixShort,longScore,shortScore,vixSignal,fullSignal};
+ });
+ const vixUsable=scored.filter(x=>['LONG','SHORT','NEUTRALE'].includes(x.vixSignal)).length;
+ const fullUsable=scored.filter(x=>['LONG','SHORT','NEUTRALE'].includes(x.fullSignal)).length;
+ el('climateValue').textContent=climate.value==null?'—':fmt(climate.value,1)+'/100';
+ el('climateSource').textContent=climate.source;
+ el('epsScoreCount').textContent=eps.size+'/'+records.length;
+ el('signalCount').textContent=vixUsable+' VIX / '+fullUsable+' completi';
+ const m=remoteClimate?.metrics;
+ el('climateWorkerMetrics').textContent=m?`Worker VIX (${remoteClimate.date}): VIX ${fmt(m.vix)} · VIX3M ${fmt(m.vix3m)} · curva ${fmt(m.termSpread)} · VRP proxy ${fmt(m.vrp)}. ${remoteClimate.date===selected?'Data allineata.':'Climate completo NON applicato a '+(selected||'nessuna data')+'.'}`:'Metriche VIX3M/VRP non disponibili'+(remoteClimateError?': '+remoteClimateError:'');
+ el('climateExplanation').textContent=`Storici prezzi: ${priceHistory.size} simboli; errori ultimo caricamento ${pricesFailures}. Con beta VIX e shock: ${eligible.length}; con EPS Score: ${eps.size}. Classificabili VIX: ${vixUsable}; completi: ${fullUsable}. ${enough?'Campione VIX sufficiente.':'Servono almeno 20 titoli con beta e almeno 3 shock VIX.'} ${climate.value==null?'Climate assente o data non coincidente: nessun segnale.':climate.verified?'Climate verificato sulla data selezionata.':'Climate manuale/proxy non verificato.'} Le etichette VIX sono PROVVISORIE, non sostituiscono il punteggio completo.`;
+ const numberScore=x=>x==null?'—':x+'/100';
+ const signalCell=(signal,provisional=false)=>`<td class="${signal==='LONG'?'good':signal==='SHORT'?'down':'muted'}">${provisional&&['LONG','SHORT','NEUTRALE'].includes(signal)?'VIX · ':''}${signal}</td>`;
+ renderTurning();
+ el('climateRows').innerHTML=scored.length?scored.sort((a,b)=>(b.vixLong??-1)-(a.vixLong??-1)).map(x=>`<tr><td>${escapeHTML(x.symbol)}</td><td class="num">${x.gap==null?'—':fmtSigned(x.gap)}</td><td class="num">${numberScore(x.eps)}</td><td class="num">${x.market?fmt(x.market.beta,3):'—'}</td><td class="num">${x.market?.shockAlpha==null?'—':fmt(x.market.shockAlpha,2)}</td><td class="num">${numberScore(x.vixLong)}</td><td class="num">${numberScore(x.vixShort)}</td>${signalCell(x.vixSignal,true)}<td class="num">${numberScore(x.longScore)}</td><td class="num">${numberScore(x.shortScore)}</td>${signalCell(x.fullSignal)}<td>${climate.value==null?'—':fmt(climate.value,1)}</td></tr>`).join(''):'<tr><td colspan="12">Nessun ticker</td></tr>';
+}
+el('climateManual').addEventListener('input',renderClimate);
+el('climateClear').onclick=()=>{el('climateManual').value='';renderClimate()};
+el('climateProxy').addEventListener('change',renderClimate);
+el('climateReload').onclick=refreshRemoteClimate;
+
+// Turning Point VIX: contemporaneous state and historical SPX 21-session study.
+// At each historical date i, only values with index <= i enter the signal.
+function turningRows(){
+ const v=priceHistory.get('^VIX'),v3=priceHistory.get('^VIX3M'),spx=priceHistory.get('^GSPC');
+ if(!v||!v3||!spx)return [];
+ const dates=[...spx.keys()].filter(d=>v.has(d)&&v3.has(d)).sort();
+ const rows=dates.map((date,i)=>({date,vix:v.get(date),v3:v3.get(date),spx:spx.get(date),rv:null,vrp:null,term:v3.get(date)-v.get(date)}));
+ for(let i=20;i<rows.length;i++){
+  const rets=[];
+  for(let k=i-19;k<=i;k++)rets.push(Math.log(rows[k].spx/rows[k-1].spx));
+  const mean=rets.reduce((a,b)=>a+b,0)/rets.length;
+  const sd=Math.sqrt(rets.reduce((a,b)=>a+(b-mean)**2,0)/(rets.length-1));
+  rows[i].rv=sd*Math.sqrt(252)*100;
+  rows[i].vrp=rows[i].vix-rows[i].rv;
+ }
+ for(let i=25;i<rows.length;i++){
+  const now=rows[i],prev=rows[i-5];
+  const dv=now.vix-prev.vix,dt=now.term-prev.term,dvrp=now.vrp-prev.vrp;
+  // Positive score = stress exhaustion; negative score = stress acceleration.
+  const vScore=Math.max(-1,Math.min(1,-dv/5));
+  const tScore=Math.max(-1,Math.min(1,dt/2));
+  const pScore=Math.max(-1,Math.min(1,dvrp/5));
+  now.tp=Math.round(50+50*(.5*vScore+.35*tScore+.15*pScore));
+  now.dv5=dv;now.dt5=dt;now.dvrp5=dvrp;
+  now.state=now.tp>=65?'STRESS IN ESAURIMENTO':now.tp<=35?'STRESS IN AUMENTO':'TRANSIZIONE / INCERTO';
+ }
+ return rows;
+}
+function renderTurning(){
+ const rows=turningRows(),r=rows.filter(x=>x.date<=selected&&x.tp!=null).at(-1);
+ el('tpState').textContent=r?.state||'DATI MANCANTI';
+ el('tpScore').textContent=r?fmt(r.tp,0)+'/100':'—';
+ el('tpTerm').textContent=r?fmtSigned(r.dt5):'—';
+ el('tpVrp').textContent=r?fmtSigned(r.dvrp5):'—';
+ el('tpExplain').textContent=r?`Dati fino al ${r.date}. Δ VIX 5 sedute: ${fmt(r.dv5)} punti; Δ curva: ${fmt(r.dt5)} punti; Δ VRP proxy: ${fmt(r.dvrp5)} punti. Turning Point è una misura di direzione dello stress, non una probabilità di inversione dei prezzi.`:'Servono storici VIX, VIX3M e SPX allineati. La data selezionata non può precedere lo storico disponibile.';
+}
+function validateTurning(){
+ const rows=turningRows();const groups=new Map();
+ for(let i=25;i+21<rows.length;i++){
+  const r=rows[i];if(!r.state)continue;
+  // Exactly 21 aligned SPX sessions forward; no future values enter r.state.
+  const f=100*(rows[i+21].spx/r.spx-1);
+  if(!Number.isFinite(f))continue;
+  if(!groups.has(r.state))groups.set(r.state,[]);
+  groups.get(r.state).push(f);
+ }
+ const names=['STRESS IN AUMENTO','TRANSIZIONE / INCERTO','STRESS IN ESAURIMENTO'];
+ el('tpTestRows').innerHTML=names.map(name=>{
+  const a=groups.get(name)||[],sorted=[...a].sort((x,y)=>x-y),n=a.length;
+  const avg=n?a.reduce((x,y)=>x+y,0)/n:null;
+  const med=n?(sorted[Math.floor((n-1)/2)]+sorted[Math.floor(n/2)])/2:null;
+  const win=n?100*a.filter(x=>x>0).length/n:null;
+  return `<tr><td>${name}</td><td>${n}</td><td>${avg==null?'—':fmt(avg,2)+'%'}</td><td>${med==null?'—':fmt(med,2)+'%'}</td><td>${win==null?'—':fmt(win,1)+'%'}</td></tr>`;
+ }).join('');
+ el('tpTestStatus').textContent=`${rows.length} sedute allineate; ${[...groups.values()].reduce((n,a)=>n+a.length,0)} osservazioni con futuro +21 sedute disponibile. Campioni sovrapposti.`;
+}
+
+// Single-click full-fidelity research export. No API credentials are serialized.
+// Fetches all EPS snapshot dates and all price series, even if other buttons were not used.
+let exportingAll=false;
+async function exportEverything(){
+ if(exportingAll)return;
+ exportingAll=true;
+ const btn=el('exportAll'),status=el('exportAllStatus');btn.disabled=true;
+ const problems=[];const update=s=>{status.textContent=s};
+ try{
+  update('Esportazione: recupero date e Climate Score…');
+  const [dateResult,climateResult]=await Promise.allSettled([
+   api('/snapshot/dates'),
+   (async()=>{const controller=new AbortController();const t=setTimeout(()=>controller.abort(),20000);try{const r=await fetch(CLIMATE_BASE+'/climate',{cache:'no-store',signal:controller.signal});const j=await r.json();if(!r.ok||j.ok!==true)throw Error(j.error||'HTTP '+r.status);return j}finally{clearTimeout(t)}})()
+  ]);
+  const exportDates=dateResult.status==='fulfilled'&&Array.isArray(dateResult.value.days)?[...new Set(dateResult.value.days)].sort():[...new Set([...days,...historySnapshots.keys()])].sort();
+  if(dateResult.status==='rejected')problems.push({source:'snapshot/dates',error:String(dateResult.reason)});
+  const climateData=climateResult.status==='fulfilled'?climateResult.value:null;
+  if(climateResult.status==='rejected')problems.push({source:'climate',error:String(climateResult.reason)});
+  const snapshots={};let idx=0;
+  const snapshotWorkers=Array.from({length:4},async()=>{
+   while(idx<exportDates.length){
+    const day=exportDates[idx++];
+    try{snapshots[day]=await api('/snapshot/day?date='+encodeURIComponent(day))}
+    catch(e){problems.push({source:'snapshot',date:day,error:String(e?.message||e)})}
+    update(`Esportazione: snapshot ${Object.keys(snapshots).length}/${exportDates.length}`);
+   }
+  });
+  await Promise.all(snapshotWorkers);
+  const tickerSet=new Set();
+  for(const obj of Object.values(snapshots))for(const r of obj.records||[])if(/^[A-Z0-9.^-]{1,12}$/.test(r.symbol||''))tickerSet.add(r.symbol);
+  for(const r of records)if(/^[A-Z0-9.^-]{1,12}$/.test(r.symbol||''))tickerSet.add(r.symbol);
+  const symbols=['^VIX','^VIX3M','^GSPC',...tickerSet];
+  const series={};let next=0,done=0;
+  await Promise.all(Array.from({length:4},async()=>{
+   while(next<symbols.length){
+    const symbol=symbols[next++];
+    try{
+     // Re-fetch to make export independent of prior user actions and cached state.
+     const points=await getSeries(symbol);
+     series[symbol]=[...points.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+    }catch(e){
+     problems.push({source:'price_history',symbol,error:String(e?.message||e)});
+     // Preserve previously loaded data as an explicitly marked fallback.
+     if(priceHistory.has(symbol)){
+      series[symbol]=[...priceHistory.get(symbol).entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+      problems.push({source:'price_history',symbol,warning:'Using cached chart series after fresh fetch failed'});
+     }
+    }
+    done++;update(`Esportazione: prezzi ${done}/${symbols.length}; snapshot ${Object.keys(snapshots).length}/${exportDates.length}`);
+   }
+  }));
+  // Reconstruct historical Turning Point independently of current UI state.
+  const sv=new Map(series['^VIX']||[]),sv3=new Map(series['^VIX3M']||[]),sspx=new Map(series['^GSPC']||[]);
+  const aligned=[...sspx.keys()].filter(d=>sv.has(d)&&sv3.has(d)).sort();
+  const tpRows=aligned.map(d=>({date:d,vix:sv.get(d),vix3m:sv3.get(d),spx:sspx.get(d),term:sv3.get(d)-sv.get(d),realizedVol20:null,vrp:null,turningPoint:null,state:null,forwardSPX21Pct:null}));
+  for(let i=20;i<tpRows.length;i++){
+   const a=[];for(let j=i-19;j<=i;j++)a.push(Math.log(tpRows[j].spx/tpRows[j-1].spx));
+   const mean=a.reduce((x,y)=>x+y,0)/a.length;
+   const sd=Math.sqrt(a.reduce((x,y)=>x+(y-mean)**2,0)/(a.length-1));
+   tpRows[i].realizedVol20=sd*Math.sqrt(252)*100;tpRows[i].vrp=tpRows[i].vix-tpRows[i].realizedVol20;
+  }
+  for(let i=25;i<tpRows.length;i++){
+   const r=tpRows[i],p=tpRows[i-5];
+   const dv=r.vix-p.vix,dt=r.term-p.term,dvrp=r.vrp-p.vrp;
+   const bound=x=>Math.max(-1,Math.min(1,x));
+   const tp=Math.round(50+50*(.5*bound(-dv/5)+.35*bound(dt/2)+.15*bound(dvrp/5)));
+   Object.assign(r,{deltaVix5:dv,deltaTerm5:dt,deltaVrp5:dvrp,turningPoint:tp,state:tp>=65?'STRESS IN ESAURIMENTO':tp<=35?'STRESS IN AUMENTO':'TRANSIZIONE / INCERTO'});
+   if(i+21<tpRows.length)r.forwardSPX21Pct=100*(tpRows[i+21].spx/r.spx-1);
+  }
+  const groups={};for(const r of tpRows){if(r.state==null||r.forwardSPX21Pct==null)continue;(groups[r.state]??=[]).push(r.forwardSPX21Pct)}
+  const summary={};for(const [name,a] of Object.entries(groups)){
+   const sorted=[...a].sort((x,y)=>x-y),n=a.length;
+   summary[name]={n,meanPct:a.reduce((x,y)=>x+y,0)/n,medianPct:(sorted[Math.floor((n-1)/2)]+sorted[Math.floor(n/2)])/2,positivePct:100*a.filter(x=>x>0).length/n};
+  }
+  // Derived current-day ticker metrics, with the exact current score formula.
+  const activeDate=selected&&snapshots[selected]?selected:exportDates.filter(d=>snapshots[d]).at(-1)||null;
+  const currentRecords=activeDate?snapshots[activeDate].records||[]:[];
+  const oldRecords=records,oldSelected=selected,oldHist=historySnapshots,oldPrices=new Map(priceHistory);
+  let derived=[];
+  try{
+   records=currentRecords;selected=activeDate||'';
+   historySnapshots=new Map(Object.entries(snapshots).filter(([d,x])=>Array.isArray(x.records)));
+   for(const [sym,pts] of Object.entries(series))priceHistory.set(sym,new Map(pts));
+   const eps=epsScores();const climate=climateData?.date===activeDate?climateData.climateScore:null;
+   const items=currentRecords.map(r=>({symbol:r.symbol,epsGap:epsGap(r),epsScore:eps.get(r.symbol)??null,market:vixExposure(r.symbol,activeDate)}));
+   const eligible=items.filter(x=>x.market?.shockAlpha!=null&&Number.isFinite(x.market.beta));
+   const betas=eligible.map(x=>x.market.beta),alphas=eligible.map(x=>x.market.shockAlpha),enough=eligible.length>=20;
+   derived=items.map(x=>{
+    let vixLong=null,vixShort=null,longScore=null,shortScore=null;
+    if(enough&&climate!=null&&eligible.includes(x)){
+     const resilience=percentileRank(x.market.beta,betas),strength=percentileRank(x.market.shockAlpha,alphas);
+     const vl=.35*climate+.25*resilience+.20*strength,vs=.35*(100-climate)+.25*(100-resilience)+.20*(100-strength);
+     vixLong=Math.round(vl/.8);vixShort=Math.round(vs/.8);
+     if(x.epsScore!=null){longScore=Math.round(vl+.20*x.epsScore);shortScore=Math.round(vs+.20*(100-x.epsScore))}
+    }
+    return {...x,vixLong,vixShort,vixSignal:classifyScores(vixLong,vixShort),longScore,shortScore,fullSignal:classifyScores(longScore,shortScore)};
+   });
+  }finally{
+   records=oldRecords;selected=oldSelected;historySnapshots=oldHist;
+   priceHistory.clear();for(const [k,v] of oldPrices)priceHistory.set(k,v);
+  }
+  const payload={
+   format:'fair-value-market-lab-full-export',version:'5.1.0',exportedAt:new Date().toISOString(),
+   endpoints:{eps:BASE,climate:CLIMATE_BASE},
+   methodology:{horizonSessions:21,prices:'Yahoo 2y 1d, adjusted where available',vrp:'VIX minus annualized realized volatility 20 sessions',turningPoint:'50% inverse VIX change 5d, 35% term spread change 5d, 15% VRP change 5d',validation:'SPX forward 21 aligned sessions; overlapping samples, not out-of-sample',score:'VIX 35%, beta 25%, shock alpha 20%, EPS 20%; provisional VIX normalized by 0.8',dataCaveat:'Yahoo histories may be revised; historic EPS snapshots are point-in-time only if archived at the time'},
+   selectedSnapshotDate:activeDate,climateWorker:climateData,
+   snapshots,priceSeries:series,turningPointHistory:tpRows,turningPointValidation:summary,
+   currentTickerScores:derived,
+   coverage:{snapshotDatesRequested:exportDates.length,snapshotDatesReceived:Object.keys(snapshots).length,priceSymbolsRequested:symbols.length,priceSymbolsReceived:Object.keys(series).length,turningPointRows:tpRows.length,derivedTickerCount:derived.length},
+   errorsAndWarnings:problems
+  };
+  update('Esportazione: compressione file completo…');
+  const raw=new TextEncoder().encode(JSON.stringify(payload));
+  let blob,name;
+  if(typeof CompressionStream==='function'){
+   const compressed=new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'));
+   blob=await new Response(compressed).blob();name='market_lab_TUTTO_'+new Date().toISOString().slice(0,10)+'.json.gz';
+  }else{
+   blob=new Blob([raw],{type:'application/json'});name='market_lab_TUTTO_'+new Date().toISOString().slice(0,10)+'.json';
+   problems.push({source:'compression',warning:'CompressionStream unsupported; exported uncompressed JSON'});
+  }
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+  update(`Esportato ${name} · ${(blob.size/1024/1024).toFixed(2)} MB · ${Object.keys(snapshots).length} snapshot · ${Object.keys(series).length} serie prezzi · ${problems.length} avvisi/errori (nel file).`);
+ }catch(e){update('Esportazione non riuscita: '+String(e?.message||e));console.error(e)}
+ finally{exportingAll=false;btn.disabled=false}
+}
+el('exportAll').onclick=exportEverything;
+
+el('tpBacktest').onclick=validateTurning;
+
+el('pricesReload').onclick=()=>loadPriceHistories(true);
+
+refresh();
+</script></body></html>
